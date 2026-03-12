@@ -1,5 +1,5 @@
 const { loadEnv, requireEnv } = require('./load-env');
-const { checkRpcHealth } = require('./rpc-health');
+const { resolveRpcUrl } = require('./resolve-rpc');
 
 const mode = (process.argv[2] || 'arb').toLowerCase();
 
@@ -39,39 +39,22 @@ if (missing.length > 0) {
 
 console.log('\nAll required env keys are present.');
 
-const primaryRpc = process.env.POLYGON_RPC_URL || '';
-const fallbackRpc = process.env.POLYGON_FALLBACK_RPC_URL || '';
-const effectiveRpc = primaryRpc || fallbackRpc;
-
-if (!effectiveRpc) {
-  console.error('RPC health: FAIL - neither POLYGON_RPC_URL nor POLYGON_FALLBACK_RPC_URL is set.');
-  process.exit(1);
-}
-
-checkRpcHealth(effectiveRpc)
-    .then((rpc) => {
-      if (!rpc.ok) {
-        const isPrimaryFail = Boolean(primaryRpc);
-        if (isPrimaryFail && fallbackRpc) {
-          return checkRpcHealth(fallbackRpc).then((fallbackStatus) => {
-            if (!fallbackStatus.ok) {
-              console.error(`RPC health: FAIL - primary: ${rpc.reason} | fallback: ${fallbackStatus.reason}`);
-              process.exit(1);
-            }
-            console.warn(`RPC health: WARN - primary failed (${rpc.reason}), fallback OK (chainId ${fallbackStatus.chainIdHex})`);
-            process.exit(0);
-          });
-        }
-
-        console.error(`RPC health: FAIL - ${rpc.reason}`);
-        if (String(rpc.reason).includes('401') || String(rpc.reason).toLowerCase().includes('unauthorized')) {
-          console.error('Tip: your RPC API key is invalid/disabled. Replace POLYGON_RPC_URL or clear it to use POLYGON_FALLBACK_RPC_URL.');
-        }
-        process.exit(1);
+resolveRpcUrl(process.env)
+  .then((resolved) => {
+    if (!resolved.ok) {
+      console.error(`RPC health: FAIL - ${resolved.reason}`);
+      if (String(resolved.reason).includes('401') || String(resolved.reason).toLowerCase().includes('unauthorized')) {
+        console.error('Tip: your RPC API key is invalid/disabled. Replace POLYGON_RPC_URL or clear it to use POLYGON_FALLBACK_RPC_URL.');
       }
-      console.log(`RPC health: OK (chainId ${rpc.chainIdHex})`);
-    })
-    .catch((e) => {
-      console.error(`RPC health: FAIL - ${e?.message || String(e)}`);
       process.exit(1);
-    });
+    }
+
+    if (resolved.warning) {
+      console.warn(`RPC health: WARN - ${resolved.warning}`);
+    }
+    console.log(`RPC health: OK via ${resolved.source} (chainId ${resolved.chainIdHex})`);
+  })
+  .catch((e) => {
+    console.error(`RPC health: FAIL - ${e?.message || String(e)}`);
+    process.exit(1);
+  });

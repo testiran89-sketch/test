@@ -63,6 +63,8 @@ npm run check-env:deploy
 npm run deploy
 ```
 
+`npm run deploy` now auto-selects a healthy RPC: it tries `POLYGON_RPC_URL` first, and if that fails, falls back to `POLYGON_FALLBACK_RPC_URL`.
+
 Quick pre-check:
 
 ```bash
@@ -78,6 +80,10 @@ Copy deployed address into `ARB_CONTRACT` in `.env`.
 ```bash
 npm run arb
 ```
+
+`npm run arb` uses the same RPC auto-selection logic as deploy.
+
+> Tip: avoid running `npx hardhat run ... --network polygon` directly; use npm scripts so RPC fallback logic is applied.
 
 If loan repayment is possible, the transaction succeeds and any remaining USDC profit stays in the contract.
 
