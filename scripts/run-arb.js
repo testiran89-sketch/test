@@ -34,7 +34,9 @@ async function main() {
 
   const {
     FLASH_AMOUNT_USDC,
-    SLIPPAGE_BPS
+    SLIPPAGE_BPS,
+    FLASH_FEE_BPS,
+    REQUIRE_NON_NEGATIVE
   } = process.env;
 
   const ARB_CONTRACT = normalizeAddress(process.env.ARB_CONTRACT, 'ARB_CONTRACT');
@@ -71,6 +73,19 @@ async function main() {
   const sellOuts = await quickRouter.getAmountsOut(crvAmount, [CRV, USDC]);
   const usdcBack = sellOuts[1];
 
+  const flashFeeBps = Number(FLASH_FEE_BPS || '9'); // Aave default 0.09%
+  const flashFee = (amountIn * BigInt(flashFeeBps)) / 10000n;
+  const repaymentEst = amountIn + flashFee;
+  const estNet = usdcBack - repaymentEst;
+
+  const requireNonNegative = (REQUIRE_NON_NEGATIVE || '1') !== '0';
+  if (requireNonNegative && estNet <= 0n) {
+    throw new Error(
+      `Precheck failed: estimated net <= 0. amountIn=${amountIn} usdcBack=${usdcBack} repaymentEst=${repaymentEst}. ` +
+      'Set REQUIRE_NON_NEGATIVE=0 to bypass (not recommended).'
+    );
+  }
+
   const slippageBps = Number(SLIPPAGE_BPS || '30');
   const minOutBuy = (crvAmount * BigInt(10000 - slippageBps)) / 10000n;
   const minOutSell = (usdcBack * BigInt(10000 - slippageBps)) / 10000n;
@@ -91,6 +106,32 @@ async function main() {
   console.log('Loaded .env from:', loadedFrom || 'not found');
   console.log('Estimated CRV bought:', crvAmount.toString());
   console.log('Estimated USDC back:', usdcBack.toString());
+  console.log('Estimated repayment (with flash fee):', repaymentEst.toString());
+  console.log('Estimated net before gas:', estNet.toString());
+
+  try {
+    await arb.startArbitrage.staticCall(amountIn, params, { gasLimit: 2_500_000 });
+    console.log('Simulation staticCall: OK');
+  } catch (e) {
+    const data = e?.data || e?.error?.data || e?.info?.error?.data;
+    try {
+      if (data) {
+        const decoded = arb.interface.parseError(data);
+        if (decoded && decoded.name === 'Unprofitable') {
+          const finalBalance = decoded.args[0];
+          const repayment = decoded.args[1];
+          throw new Error(
+            `Simulation reverted: Unprofitable(finalBalance=${finalBalance}, repayment=${repayment}). ` +
+            'Route is not profitable at current state.'
+          );
+        }
+        throw new Error(`Simulation reverted with contract error: ${decoded?.name || 'unknown'}`);
+      }
+    } catch (_) {
+      // fall through to generic error below
+    }
+    throw new Error(`Simulation failed before sending tx: ${e?.shortMessage || e?.message || String(e)}`);
+  }
 
   const tx = await arb.startArbitrage(amountIn, params, { gasLimit: 2_500_000 });
   console.log('Submitted tx:', tx.hash);

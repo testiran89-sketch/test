@@ -87,6 +87,11 @@ npm run arb
 
 > Tip: avoid running `npx hardhat run ... --network polygon` directly; use npm scripts so RPC fallback logic is applied.
 
+Runner now does a preflight profitability/safety simulation before broadcast:
+- estimates `repayment = amountIn + flashFee` (configurable via `FLASH_FEE_BPS`, default 9 bps),
+- checks estimated net `usdcBack - repayment` (blocked when `REQUIRE_NON_NEGATIVE=1`),
+- executes `startArbitrage.staticCall(...)` to catch on-chain revert reasons before spending gas.
+
 If loan repayment is possible, the transaction succeeds and any remaining USDC profit stays in the contract.
 
 ## 5) Withdraw profit
