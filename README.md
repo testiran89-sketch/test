@@ -1,4 +1,4 @@
-# Polygon Flash-Loan Arbitrage (QuickSwap -> Uniswap)
+# Polygon Flash-Loan Arbitrage (SushiSwap -> QuickSwap, CRV/USDC)
 
 > Educational code. Use at your own risk.
 

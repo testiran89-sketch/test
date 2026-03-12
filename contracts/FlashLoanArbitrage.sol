@@ -59,7 +59,7 @@ contract FlashLoanArbitrage is IFlashLoanSimpleReceiver {
         address buyRouter;
         address sellRouter;
         address tokenBorrow; // USDC
-        address tokenOther;  // SNX
+        address tokenOther;  // CRV (or target token)
         uint256 minOutBuy;
         uint256 minOutSell;
         uint256 deadline;

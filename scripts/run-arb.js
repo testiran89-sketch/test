@@ -14,50 +14,50 @@ async function main() {
   const {
     ARB_CONTRACT,
     USDC,
-    SNX,
+    CRV,
+    SUSHISWAP_ROUTER,
     QUICKSWAP_ROUTER,
-    UNISWAP_ROUTER,
     FLASH_AMOUNT_USDC,
     SLIPPAGE_BPS
   } = process.env;
 
-  if (!ARB_CONTRACT || !USDC || !SNX || !QUICKSWAP_ROUTER || !UNISWAP_ROUTER || !FLASH_AMOUNT_USDC) {
-    throw new Error('Missing required env vars: ARB_CONTRACT, USDC, SNX, QUICKSWAP_ROUTER, UNISWAP_ROUTER, FLASH_AMOUNT_USDC');
+  if (!ARB_CONTRACT || !USDC || !CRV || !SUSHISWAP_ROUTER || !QUICKSWAP_ROUTER || !FLASH_AMOUNT_USDC) {
+    throw new Error('Missing required env vars: ARB_CONTRACT, USDC, CRV, SUSHISWAP_ROUTER, QUICKSWAP_ROUTER, FLASH_AMOUNT_USDC');
   }
 
   const [signer] = await hre.ethers.getSigners();
   const arb = await hre.ethers.getContractAt('FlashLoanArbitrage', ARB_CONTRACT, signer);
   const usdc = new hre.ethers.Contract(USDC, ERC20_ABI, signer);
+  const sushiRouter = new hre.ethers.Contract(SUSHISWAP_ROUTER, ROUTER_ABI, signer);
   const quickRouter = new hre.ethers.Contract(QUICKSWAP_ROUTER, ROUTER_ABI, signer);
-  const uniRouter = new hre.ethers.Contract(UNISWAP_ROUTER, ROUTER_ABI, signer);
 
   const usdcDecimals = await usdc.decimals();
   const amountIn = hre.ethers.parseUnits(FLASH_AMOUNT_USDC, usdcDecimals);
 
-  const buyOuts = await quickRouter.getAmountsOut(amountIn, [USDC, SNX]);
-  const snxAmount = buyOuts[1];
+  const buyOuts = await sushiRouter.getAmountsOut(amountIn, [USDC, CRV]);
+  const crvAmount = buyOuts[1];
 
-  const sellOuts = await uniRouter.getAmountsOut(snxAmount, [SNX, USDC]);
+  const sellOuts = await quickRouter.getAmountsOut(crvAmount, [CRV, USDC]);
   const usdcBack = sellOuts[1];
 
   const slippageBps = Number(SLIPPAGE_BPS || '30');
-  const minOutBuy = (snxAmount * BigInt(10000 - slippageBps)) / 10000n;
+  const minOutBuy = (crvAmount * BigInt(10000 - slippageBps)) / 10000n;
   const minOutSell = (usdcBack * BigInt(10000 - slippageBps)) / 10000n;
 
   const now = Math.floor(Date.now() / 1000);
   const deadline = now + 120;
 
   const params = {
-    buyRouter: QUICKSWAP_ROUTER,
-    sellRouter: UNISWAP_ROUTER,
+    buyRouter: SUSHISWAP_ROUTER,
+    sellRouter: QUICKSWAP_ROUTER,
     tokenBorrow: USDC,
-    tokenOther: SNX,
+    tokenOther: CRV,
     minOutBuy,
     minOutSell,
     deadline
   };
 
-  console.log('Estimated SNX bought:', snxAmount.toString());
+  console.log('Estimated CRV bought:', crvAmount.toString());
   console.log('Estimated USDC back:', usdcBack.toString());
 
   const tx = await arb.startArbitrage(amountIn, params, { gasLimit: 2_500_000 });
