@@ -25,13 +25,15 @@ npm run deploy
 
 Copy deployed address into `ARB_CONTRACT` in `.env`.
 
+`ARB_CONTRACT` یعنی آدرس همان قرارداد `FlashLoanArbitrage` که با دستور `npm run deploy` روی شبکه Polygon برای خودت دیپلوی می‌کنی.
+
 ## 4) Run one arbitrage attempt
 
 ```bash
 npm run arb
 ```
 
-If profitable under `MIN_PROFIT_USDC`, the transaction succeeds and profit remains in contract.
+If loan repayment is possible, the transaction succeeds and any remaining USDC profit stays in the contract.
 
 ## 5) Withdraw profit
 
@@ -41,6 +43,6 @@ Use Hardhat console or a script to call:
 
 ## Notes
 
-- Contract reverts if `finalBalance < repayment + minProfitUSDC`.
+- Contract reverts only if it cannot repay the flash-loan (`finalBalance < repayment`).
 - Uses `amountOutMin` on both swaps for slippage protection.
 - You should run simulations on a fork before mainnet.

@@ -45,12 +45,10 @@ contract FlashLoanArbitrage is IFlashLoanSimpleReceiver {
     address public immutable owner;
     IAavePool public immutable aavePool;
 
-    uint256 public minProfitUSDC;
-
     error OnlyOwner();
     error NotAavePool();
     error BadInitiator();
-    error Unprofitable(uint256 finalBalance, uint256 repayment, uint256 minProfit);
+    error Unprofitable(uint256 finalBalance, uint256 repayment);
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert OnlyOwner();
@@ -67,14 +65,9 @@ contract FlashLoanArbitrage is IFlashLoanSimpleReceiver {
         uint256 deadline;
     }
 
-    constructor(address _aavePool, uint256 _minProfitUSDC) {
+    constructor(address _aavePool) {
         owner = msg.sender;
         aavePool = IAavePool(_aavePool);
-        minProfitUSDC = _minProfitUSDC;
-    }
-
-    function setMinProfitUSDC(uint256 newMinProfit) external onlyOwner {
-        minProfitUSDC = newMinProfit;
     }
 
     function startArbitrage(
@@ -130,8 +123,10 @@ contract FlashLoanArbitrage is IFlashLoanSimpleReceiver {
         uint256 finalBalance = IERC20(p.tokenBorrow).balanceOf(address(this));
         uint256 repayment = amount + premium;
 
-        if (finalBalance < repayment + minProfitUSDC) {
-            revert Unprofitable(finalBalance, repayment, minProfitUSDC);
+        // Always execute if loan repayment is possible.
+        // Any leftover balance (even very small profit) remains in contract and is withdrawable.
+        if (finalBalance < repayment) {
+            revert Unprofitable(finalBalance, repayment);
         }
 
         _approveIfNeeded(p.tokenBorrow, address(aavePool), repayment);
