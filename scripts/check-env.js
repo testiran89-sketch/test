@@ -1,4 +1,5 @@
 const { loadEnv, requireEnv } = require('./load-env');
+const { checkRpcHealth } = require('./rpc-health');
 
 const mode = (process.argv[2] || 'arb').toLowerCase();
 
@@ -38,3 +39,18 @@ if (missing.length > 0) {
 }
 
 console.log('\nAll required env keys are present.');
+
+if (process.env.POLYGON_RPC_URL) {
+  checkRpcHealth(process.env.POLYGON_RPC_URL)
+    .then((rpc) => {
+      if (!rpc.ok) {
+        console.error(`RPC health: FAIL - ${rpc.reason}`);
+        process.exit(1);
+      }
+      console.log(`RPC health: OK (chainId ${rpc.chainIdHex})`);
+    })
+    .catch((e) => {
+      console.error(`RPC health: FAIL - ${e?.message || String(e)}`);
+      process.exit(1);
+    });
+}

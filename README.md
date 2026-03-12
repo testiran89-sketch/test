@@ -29,6 +29,8 @@ set +a
 
 If you see `getaddrinfo ENOTFOUND polygon-mainnet.g.alchemy.com`, your `POLYGON_RPC_URL` is invalid (usually because `YOUR_API_KEY` was not replaced). Use a real URL.
 
+If you see `API key disabled / tenant disabled / 403`, your RPC provider key is disabled or suspended. Replace `POLYGON_RPC_URL` with an active endpoint and re-run checks.
+
 ## 2) Compile
 
 ```bash
@@ -40,6 +42,8 @@ npm run build
 ```bash
 npm run check-env
 ```
+
+`check-env` now validates both env keys and RPC health (calls `eth_chainId`).
 
 برای قبل از deploy:
 

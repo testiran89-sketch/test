@@ -1,4 +1,5 @@
 const { loadEnv, requireEnv } = require('./load-env');
+const { checkRpcHealth } = require('./rpc-health');
 const hre = require('hardhat');
 
 const ERC20_ABI = [
@@ -14,6 +15,7 @@ async function main() {
   const { loadedFrom } = loadEnv();
 
   const required = [
+    'POLYGON_RPC_URL',
     'ARB_CONTRACT',
     'USDC',
     'CRV',
@@ -31,6 +33,7 @@ async function main() {
   }
 
   const {
+    POLYGON_RPC_URL,
     ARB_CONTRACT,
     USDC,
     CRV,
@@ -39,6 +42,14 @@ async function main() {
     FLASH_AMOUNT_USDC,
     SLIPPAGE_BPS
   } = process.env;
+
+  const rpcStatus = await checkRpcHealth(POLYGON_RPC_URL || '');
+  if (!rpcStatus.ok) {
+    throw new Error(
+      `POLYGON_RPC_URL is not usable: ${rpcStatus.reason}\n` +
+      'Your provider key may be disabled. Put a valid RPC URL in .env and retry.'
+    );
+  }
 
   const [signer] = await hre.ethers.getSigners();
   const arb = await hre.ethers.getContractAt('FlashLoanArbitrage', ARB_CONTRACT, signer);

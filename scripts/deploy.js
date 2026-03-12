@@ -1,4 +1,5 @@
 const { loadEnv, requireEnv } = require('./load-env');
+const { checkRpcHealth } = require('./rpc-health');
 const hre = require('hardhat');
 
 async function main() {
@@ -16,6 +17,14 @@ async function main() {
   if (polygonRpcUrl.includes('YOUR_API_KEY')) {
     throw new Error(
       'POLYGON_RPC_URL still contains placeholder YOUR_API_KEY. Set a real RPC URL in .env (e.g. https://polygon-rpc.com or your provider URL).'
+    );
+  }
+
+  const rpcStatus = await checkRpcHealth(polygonRpcUrl);
+  if (!rpcStatus.ok) {
+    throw new Error(
+      `POLYGON_RPC_URL is not usable: ${rpcStatus.reason}\n` +
+      'Fix: replace the RPC URL/API key in .env (or switch provider), then retry.'
     );
   }
 
