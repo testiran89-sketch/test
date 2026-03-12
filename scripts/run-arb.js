@@ -15,7 +15,6 @@ async function main() {
   const { loadedFrom } = loadEnv();
 
   const required = [
-    'POLYGON_RPC_URL',
     'ARB_CONTRACT',
     'USDC',
     'CRV',
@@ -33,7 +32,6 @@ async function main() {
   }
 
   const {
-    POLYGON_RPC_URL,
     ARB_CONTRACT,
     USDC,
     CRV,
@@ -43,7 +41,12 @@ async function main() {
     SLIPPAGE_BPS
   } = process.env;
 
-  const rpcStatus = await checkRpcHealth(POLYGON_RPC_URL || '');
+  const effectiveRpcUrl = process.env.POLYGON_RPC_URL || process.env.POLYGON_FALLBACK_RPC_URL || '';
+  if (!effectiveRpcUrl) {
+    throw new Error('Neither POLYGON_RPC_URL nor POLYGON_FALLBACK_RPC_URL is set in .env');
+  }
+
+  const rpcStatus = await checkRpcHealth(effectiveRpcUrl);
   if (!rpcStatus.ok) {
     throw new Error(
       `POLYGON_RPC_URL is not usable: ${rpcStatus.reason}\n` +

@@ -5,7 +5,7 @@ const hre = require('hardhat');
 async function main() {
   const { loadedFrom } = loadEnv();
 
-  const missing = requireEnv(['POLYGON_RPC_URL', 'AAVE_POOL']);
+  const missing = requireEnv(['AAVE_POOL']);
   if (missing.length > 0) {
     throw new Error(
       `Missing required env vars: ${missing.join(', ')}\n` +
@@ -13,7 +13,11 @@ async function main() {
     );
   }
 
-  const polygonRpcUrl = process.env.POLYGON_RPC_URL || '';
+  const polygonRpcUrl = process.env.POLYGON_RPC_URL || process.env.POLYGON_FALLBACK_RPC_URL || '';
+  if (!polygonRpcUrl) {
+    throw new Error('Neither POLYGON_RPC_URL nor POLYGON_FALLBACK_RPC_URL is set in .env');
+  }
+
   if (polygonRpcUrl.includes('YOUR_API_KEY')) {
     throw new Error(
       'POLYGON_RPC_URL still contains placeholder YOUR_API_KEY. Set a real RPC URL in .env (e.g. https://polygon-rpc.com or your provider URL).'

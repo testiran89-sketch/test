@@ -10,6 +10,7 @@ cp .env.example .env
 ```
 
 Fill `.env` with your Polygon RPC API key and wallet private key.
+You can keep `POLYGON_FALLBACK_RPC_URL=https://polygon-rpc.com` as backup.
 
 Important: `echo $VAR` فقط متغیرهای **export شده در همان شل** را نشان می‌دهد. اگر فقط داخل `.env` ذخیره کردی، ممکن است `echo` خالی باشد ولی اسکریپت با dotenv آن را بخواند.
 
@@ -30,6 +31,11 @@ set +a
 If you see `getaddrinfo ENOTFOUND polygon-mainnet.g.alchemy.com`, your `POLYGON_RPC_URL` is invalid (usually because `YOUR_API_KEY` was not replaced). Use a real URL.
 
 If you see `API key disabled / tenant disabled / 403`, your RPC provider key is disabled or suspended. Replace `POLYGON_RPC_URL` with an active endpoint and re-run checks.
+
+If you see `401 Unauthorized`, your RPC key is invalid/expired. Quick fix:
+
+1. set a valid `POLYGON_RPC_URL`, or
+2. temporarily clear `POLYGON_RPC_URL` and rely on `POLYGON_FALLBACK_RPC_URL`.
 
 ## 2) Compile
 
