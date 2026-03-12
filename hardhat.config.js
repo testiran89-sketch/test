@@ -2,7 +2,7 @@ require('@nomicfoundation/hardhat-toolbox');
 require('dotenv').config();
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY || '';
-const POLYGON_RPC_URL = process.env.POLYGON_RPC_URL || '';
+const POLYGON_RPC_URL = process.env.POLYGON_RPC_URL || 'https://polygon-rpc.com';
 
 module.exports = {
   solidity: {

@@ -11,6 +11,8 @@ cp .env.example .env
 
 Fill `.env` with your Polygon RPC API key and wallet private key.
 
+If you see `getaddrinfo ENOTFOUND polygon-mainnet.g.alchemy.com`, your `POLYGON_RPC_URL` is invalid (usually because `YOUR_API_KEY` was not replaced). Use a real URL.
+
 ## 2) Compile
 
 ```bash
@@ -21,6 +23,12 @@ npm run build
 
 ```bash
 npm run deploy
+```
+
+Quick pre-check:
+
+```bash
+echo $POLYGON_RPC_URL
 ```
 
 Copy deployed address into `ARB_CONTRACT` in `.env`.
