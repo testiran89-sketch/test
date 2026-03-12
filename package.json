@@ -6,7 +6,9 @@
     "build": "hardhat compile",
     "test": "hardhat test",
     "deploy": "hardhat run scripts/deploy.js --network polygon",
-    "arb": "hardhat run scripts/run-arb.js --network polygon"
+    "arb": "hardhat run scripts/run-arb.js --network polygon",
+    "check-env": "node scripts/check-env.js arb",
+    "check-env:deploy": "node scripts/check-env.js deploy"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",

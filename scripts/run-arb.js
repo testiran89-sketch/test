@@ -1,4 +1,4 @@
-require('dotenv').config();
+const { loadEnv, requireEnv } = require('./load-env');
 const hre = require('hardhat');
 
 const ERC20_ABI = [
@@ -11,6 +11,25 @@ const ROUTER_ABI = [
 ];
 
 async function main() {
+  const { loadedFrom } = loadEnv();
+
+  const required = [
+    'ARB_CONTRACT',
+    'USDC',
+    'CRV',
+    'SUSHISWAP_ROUTER',
+    'QUICKSWAP_ROUTER',
+    'FLASH_AMOUNT_USDC'
+  ];
+  const missing = requireEnv(required);
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required env vars: ${missing.join(', ')}\n` +
+      `Loaded .env from: ${loadedFrom || 'not found'}\n` +
+      'Tip: ensure values exist in .env (project root) or export them in the same terminal session.'
+    );
+  }
+
   const {
     ARB_CONTRACT,
     USDC,
@@ -20,10 +39,6 @@ async function main() {
     FLASH_AMOUNT_USDC,
     SLIPPAGE_BPS
   } = process.env;
-
-  if (!ARB_CONTRACT || !USDC || !CRV || !SUSHISWAP_ROUTER || !QUICKSWAP_ROUTER || !FLASH_AMOUNT_USDC) {
-    throw new Error('Missing required env vars: ARB_CONTRACT, USDC, CRV, SUSHISWAP_ROUTER, QUICKSWAP_ROUTER, FLASH_AMOUNT_USDC');
-  }
 
   const [signer] = await hre.ethers.getSigners();
   const arb = await hre.ethers.getContractAt('FlashLoanArbitrage', ARB_CONTRACT, signer);
@@ -57,6 +72,7 @@ async function main() {
     deadline
   };
 
+  console.log('Loaded .env from:', loadedFrom || 'not found');
   console.log('Estimated CRV bought:', crvAmount.toString());
   console.log('Estimated USDC back:', usdcBack.toString());
 

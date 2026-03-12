@@ -11,12 +11,40 @@ cp .env.example .env
 
 Fill `.env` with your Polygon RPC API key and wallet private key.
 
+Important: `echo $VAR` فقط متغیرهای **export شده در همان شل** را نشان می‌دهد. اگر فقط داخل `.env` ذخیره کردی، ممکن است `echo` خالی باشد ولی اسکریپت با dotenv آن را بخواند.
+
+برای بررسی مطمئن از داخل پروژه:
+
+```bash
+npm run check-env:deploy
+```
+
+اگر می‌خواهی `.env` را وارد شل کنی (اختیاری):
+
+```bash
+set -a
+source .env
+set +a
+```
+
 If you see `getaddrinfo ENOTFOUND polygon-mainnet.g.alchemy.com`, your `POLYGON_RPC_URL` is invalid (usually because `YOUR_API_KEY` was not replaced). Use a real URL.
 
 ## 2) Compile
 
 ```bash
 npm run build
+```
+
+## 2.1) Validate env quickly
+
+```bash
+npm run check-env
+```
+
+برای قبل از deploy:
+
+```bash
+npm run check-env:deploy
 ```
 
 ## 3) Deploy contract
