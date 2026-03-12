@@ -1,5 +1,6 @@
 const { loadEnv, requireEnv } = require('./load-env');
 const { resolveRpcUrl } = require('./resolve-rpc');
+const { normalizeAddress } = require('./address-utils');
 
 const mode = (process.argv[2] || 'arb').toLowerCase();
 
@@ -38,6 +39,21 @@ if (missing.length > 0) {
 }
 
 console.log('\nAll required env keys are present.');
+
+const addressFields = mode === 'deploy'
+  ? ['AAVE_POOL']
+  : ['ARB_CONTRACT', 'USDC', 'CRV', 'SUSHISWAP_ROUTER', 'QUICKSWAP_ROUTER'];
+
+for (const field of addressFields) {
+  try {
+    normalizeAddress(process.env[field], field);
+  } catch (e) {
+    console.error(`Address validation: FAIL - ${e.message}`);
+    process.exit(1);
+  }
+}
+
+console.log('Address validation: OK');
 
 resolveRpcUrl(process.env)
   .then((resolved) => {

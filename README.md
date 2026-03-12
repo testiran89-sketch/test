@@ -37,6 +37,8 @@ If you see `401 Unauthorized`, your RPC key is invalid/expired. Quick fix:
 1. set a valid `POLYGON_RPC_URL`, or
 2. temporarily clear `POLYGON_RPC_URL` and rely on `POLYGON_FALLBACK_RPC_URL`.
 
+If you see `bad address checksum`, your address casing is inconsistent. Scripts now auto-normalize addresses, and `npm run check-env` validates them before execution.
+
 ## 2) Compile
 
 ```bash

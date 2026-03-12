@@ -1,5 +1,6 @@
 const { loadEnv, requireEnv } = require('./load-env');
 const { checkRpcHealth } = require('./rpc-health');
+const { normalizeAddress } = require('./address-utils');
 const hre = require('hardhat');
 
 const ERC20_ABI = [
@@ -32,14 +33,15 @@ async function main() {
   }
 
   const {
-    ARB_CONTRACT,
-    USDC,
-    CRV,
-    SUSHISWAP_ROUTER,
-    QUICKSWAP_ROUTER,
     FLASH_AMOUNT_USDC,
     SLIPPAGE_BPS
   } = process.env;
+
+  const ARB_CONTRACT = normalizeAddress(process.env.ARB_CONTRACT, 'ARB_CONTRACT');
+  const USDC = normalizeAddress(process.env.USDC, 'USDC');
+  const CRV = normalizeAddress(process.env.CRV, 'CRV');
+  const SUSHISWAP_ROUTER = normalizeAddress(process.env.SUSHISWAP_ROUTER, 'SUSHISWAP_ROUTER');
+  const QUICKSWAP_ROUTER = normalizeAddress(process.env.QUICKSWAP_ROUTER, 'QUICKSWAP_ROUTER');
 
   const effectiveRpcUrl = process.env.POLYGON_RPC_URL || process.env.POLYGON_FALLBACK_RPC_URL || '';
   if (!effectiveRpcUrl) {

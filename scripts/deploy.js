@@ -1,5 +1,6 @@
 const { loadEnv, requireEnv } = require('./load-env');
 const { checkRpcHealth } = require('./rpc-health');
+const { normalizeAddress } = require('./address-utils');
 const hre = require('hardhat');
 
 async function main() {
@@ -32,7 +33,7 @@ async function main() {
     );
   }
 
-  const aavePool = process.env.AAVE_POOL;
+  const aavePool = normalizeAddress(process.env.AAVE_POOL, 'AAVE_POOL');
 
   const Factory = await hre.ethers.getContractFactory('FlashLoanArbitrage');
   const c = await Factory.deploy(aavePool);
