@@ -12,6 +12,26 @@ const ROUTER_ABI = [
   'function getAmountsOut(uint amountIn, address[] calldata path) external view returns (uint[] memory amounts)'
 ];
 
+const WMATIC = '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270';
+
+function parsePath(raw, defaults) {
+  if (!raw || !raw.trim()) return defaults;
+  return raw.split(',').map((p) => normalizeAddress(p.trim(), 'PATH_ITEM'));
+}
+
+async function quotePath(router, amountIn, path) {
+  try {
+    const out = await router.getAmountsOut(amountIn, path);
+    return { ok: true, out: out[out.length - 1], path };
+  } catch (e) {
+    return { ok: false, error: e?.shortMessage || e?.message || String(e), path };
+  }
+}
+
+function pathToStr(path) {
+  return path.join(' -> ');
+}
+
 async function main() {
   const { loadedFrom } = loadEnv();
 
@@ -36,7 +56,11 @@ async function main() {
     FLASH_AMOUNT_USDC,
     SLIPPAGE_BPS,
     FLASH_FEE_BPS,
-    REQUIRE_NON_NEGATIVE
+    REQUIRE_NON_NEGATIVE,
+    BUY_PATH,
+    SELL_PATH,
+    MAX_BUY_PRICE_USDC,
+    MIN_SELL_PRICE_USDC
   } = process.env;
 
   const ARB_CONTRACT = normalizeAddress(process.env.ARB_CONTRACT, 'ARB_CONTRACT');
@@ -67,11 +91,37 @@ async function main() {
   const usdcDecimals = await usdc.decimals();
   const amountIn = hre.ethers.parseUnits(FLASH_AMOUNT_USDC, usdcDecimals);
 
-  const buyOuts = await sushiRouter.getAmountsOut(amountIn, [USDC, CRV]);
-  const crvAmount = buyOuts[1];
+  const buyPathDirect = [USDC, CRV];
+  const buyPathViaWmatic = [USDC, WMATIC, CRV];
+  const buyPathConfigured = parsePath(BUY_PATH, buyPathDirect);
+  const buyCandidates = [buyPathConfigured, buyPathDirect, buyPathViaWmatic]
+    .filter((p, i, a) => a.findIndex((x) => x.join('-') === p.join('-')) === i);
 
-  const sellOuts = await quickRouter.getAmountsOut(crvAmount, [CRV, USDC]);
-  const usdcBack = sellOuts[1];
+  let bestBuy = null;
+  for (const p of buyCandidates) {
+    const q = await quotePath(sushiRouter, amountIn, p);
+    if (q.ok && (!bestBuy || q.out > bestBuy.out)) bestBuy = q;
+  }
+  if (!bestBuy) {
+    throw new Error('No valid buy path on SushiSwap. Set BUY_PATH in .env (comma-separated addresses).');
+  }
+  const crvAmount = bestBuy.out;
+
+  const sellPathDirect = [CRV, USDC];
+  const sellPathViaWmatic = [CRV, WMATIC, USDC];
+  const sellPathConfigured = parsePath(SELL_PATH, sellPathDirect);
+  const sellCandidates = [sellPathConfigured, sellPathDirect, sellPathViaWmatic]
+    .filter((p, i, a) => a.findIndex((x) => x.join('-') === p.join('-')) === i);
+
+  let bestSell = null;
+  for (const p of sellCandidates) {
+    const q = await quotePath(quickRouter, crvAmount, p);
+    if (q.ok && (!bestSell || q.out > bestSell.out)) bestSell = q;
+  }
+  if (!bestSell) {
+    throw new Error('No valid sell path on QuickSwap. Set SELL_PATH in .env (comma-separated addresses).');
+  }
+  const usdcBack = bestSell.out;
 
   const flashFeeBps = Number(FLASH_FEE_BPS || '9'); // Aave default 0.09%
   const flashFee = (amountIn * BigInt(flashFeeBps)) / 10000n;
@@ -79,6 +129,20 @@ async function main() {
   const estNet = usdcBack - repaymentEst;
 
   const requireNonNegative = (REQUIRE_NON_NEGATIVE || '1') !== '0';
+
+  const usdcUnit = 10n ** BigInt(usdcDecimals);
+  const buyPriceScaled = (amountIn * usdcUnit) / (crvAmount || 1n);
+  const sellPriceScaled = (usdcBack * usdcUnit) / (crvAmount || 1n);
+  const maxBuyPrice = MAX_BUY_PRICE_USDC ? hre.ethers.parseUnits(MAX_BUY_PRICE_USDC, usdcDecimals) : null;
+  const minSellPrice = MIN_SELL_PRICE_USDC ? hre.ethers.parseUnits(MIN_SELL_PRICE_USDC, usdcDecimals) : null;
+
+  if (maxBuyPrice && buyPriceScaled > maxBuyPrice) {
+    throw new Error(`Precheck failed: buy implied price too high (${buyPriceScaled} > ${maxBuyPrice}). Route likely wrong.`);
+  }
+  if (minSellPrice && sellPriceScaled < minSellPrice) {
+    throw new Error(`Precheck failed: sell implied price too low (${sellPriceScaled} < ${minSellPrice}). Route likely wrong.`);
+  }
+
   if (requireNonNegative && estNet <= 0n) {
     throw new Error(
       `Precheck failed: estimated net <= 0. amountIn=${amountIn} usdcBack=${usdcBack} repaymentEst=${repaymentEst}. ` +
@@ -98,16 +162,22 @@ async function main() {
     sellRouter: QUICKSWAP_ROUTER,
     tokenBorrow: USDC,
     tokenOther: CRV,
+    buyPath: bestBuy.path,
+    sellPath: bestSell.path,
     minOutBuy,
     minOutSell,
     deadline
   };
 
   console.log('Loaded .env from:', loadedFrom || 'not found');
+  console.log('Buy path:', pathToStr(bestBuy.path));
+  console.log('Sell path:', pathToStr(bestSell.path));
   console.log('Estimated CRV bought:', crvAmount.toString());
   console.log('Estimated USDC back:', usdcBack.toString());
   console.log('Estimated repayment (with flash fee):', repaymentEst.toString());
   console.log('Estimated net before gas:', estNet.toString());
+  console.log('Implied buy price (USDC per CRV, scaled):', buyPriceScaled.toString());
+  console.log('Implied sell price (USDC per CRV, scaled):', sellPriceScaled.toString());
 
   try {
     await arb.startArbitrage.staticCall(amountIn, params, { gasLimit: 2_500_000 });

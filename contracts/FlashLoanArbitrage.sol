@@ -60,6 +60,8 @@ contract FlashLoanArbitrage is IFlashLoanSimpleReceiver {
         address sellRouter;
         address tokenBorrow; // USDC
         address tokenOther;  // CRV (or target token)
+        address[] buyPath;
+        address[] sellPath;
         uint256 minOutBuy;
         uint256 minOutSell;
         uint256 deadline;
@@ -93,14 +95,17 @@ contract FlashLoanArbitrage is IFlashLoanSimpleReceiver {
 
         _approveIfNeeded(p.tokenBorrow, p.buyRouter, amount);
 
-        address[] memory buyPath = new address[](2);
-        buyPath[0] = p.tokenBorrow;
-        buyPath[1] = p.tokenOther;
+        require(p.buyPath.length >= 2, 'bad buy path');
+        require(p.sellPath.length >= 2, 'bad sell path');
+        require(p.buyPath[0] == p.tokenBorrow, 'buy path start');
+        require(p.buyPath[p.buyPath.length - 1] == p.tokenOther, 'buy path end');
+        require(p.sellPath[0] == p.tokenOther, 'sell path start');
+        require(p.sellPath[p.sellPath.length - 1] == p.tokenBorrow, 'sell path end');
 
         IUniswapV2Router(p.buyRouter).swapExactTokensForTokens(
             amount,
             p.minOutBuy,
-            buyPath,
+            p.buyPath,
             address(this),
             p.deadline
         );
@@ -108,14 +113,10 @@ contract FlashLoanArbitrage is IFlashLoanSimpleReceiver {
         uint256 midBalance = IERC20(p.tokenOther).balanceOf(address(this));
         _approveIfNeeded(p.tokenOther, p.sellRouter, midBalance);
 
-        address[] memory sellPath = new address[](2);
-        sellPath[0] = p.tokenOther;
-        sellPath[1] = p.tokenBorrow;
-
         IUniswapV2Router(p.sellRouter).swapExactTokensForTokens(
             midBalance,
             p.minOutSell,
-            sellPath,
+            p.sellPath,
             address(this),
             p.deadline
         );
