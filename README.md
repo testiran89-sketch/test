@@ -91,11 +91,13 @@ Runner now does a preflight profitability/safety simulation before broadcast:
 - estimates `repayment = amountIn + flashFee` (configurable via `FLASH_FEE_BPS`, default 9 bps),
 - checks estimated net `usdcBack - repayment` (blocked when `REQUIRE_NON_NEGATIVE=1`),
 - executes `startArbitrage.staticCall(...)` to catch on-chain revert reasons before spending gas.
-- auto-tests multiple paths (`direct` and `via WMATIC`) and chooses the **best full buy+sell combination by final USDC back**.
+- auto-tests multiple paths (`direct`, `via WMATIC`, `via WETH`) and chooses the **best full buy+sell combination by final USDC back**.
 
 Optional routing/sanity envs:
 - `BUY_PATH`, `SELL_PATH` (comma-separated addresses),
 - `MAX_BUY_PRICE_USDC`, `MIN_SELL_PRICE_USDC` guard rails.
+
+Price sanity calculations now use token decimals correctly (`USDC=6`, `CRV=18`) by reading decimals of both tokens.
 
 ⚠️ If you pull this update, redeploy contract and update `ARB_CONTRACT` because `ArbParams` ABI changed (dynamic paths were added).
 

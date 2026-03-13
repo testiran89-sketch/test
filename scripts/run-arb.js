@@ -13,6 +13,7 @@ const ROUTER_ABI = [
 ];
 
 const WMATIC = '0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270';
+const WETH = '0x7ceb23fd6bc0add59e62ac25578270cff1b9f619';
 
 function parsePath(raw, defaults) {
   if (!raw || !raw.trim()) return defaults;
@@ -89,24 +90,29 @@ async function main() {
   const [signer] = await hre.ethers.getSigners();
   const arb = await hre.ethers.getContractAt('FlashLoanArbitrage', ARB_CONTRACT, signer);
   const usdc = new hre.ethers.Contract(USDC, ERC20_ABI, signer);
+  const crv = new hre.ethers.Contract(CRV, ERC20_ABI, signer);
   const sushiRouter = new hre.ethers.Contract(SUSHISWAP_ROUTER, ROUTER_ABI, signer);
   const quickRouter = new hre.ethers.Contract(QUICKSWAP_ROUTER, ROUTER_ABI, signer);
 
   const usdcDecimals = await usdc.decimals();
+  const crvDecimals = await crv.decimals();
   const amountIn = hre.ethers.parseUnits(FLASH_AMOUNT_USDC, usdcDecimals);
 
   const buyPathDirect = [USDC, CRV];
   const buyPathViaWmatic = [USDC, WMATIC, CRV];
+  const buyPathViaWeth = [USDC, WETH, CRV];
   const buyPathConfigured = parsePath(BUY_PATH, buyPathDirect);
-  const buyCandidates = uniquePaths([buyPathConfigured, buyPathDirect, buyPathViaWmatic]);
+  const buyCandidates = uniquePaths([buyPathConfigured, buyPathDirect, buyPathViaWmatic, buyPathViaWeth]);
 
   const sellPathDirect = [CRV, USDC];
   const sellPathViaWmatic = [CRV, WMATIC, USDC];
+  const sellPathViaWeth = [CRV, WETH, USDC];
   const sellPathConfigured = parsePath(SELL_PATH, sellPathDirect);
-  const sellCandidates = uniquePaths([sellPathConfigured, sellPathDirect, sellPathViaWmatic]);
+  const sellCandidates = uniquePaths([sellPathConfigured, sellPathDirect, sellPathViaWmatic, sellPathViaWeth]);
 
   const buyQuotes = [];
   for (const p of buyCandidates) {
+    console.log('Trying buy path:', pathToStr(p));
     buyQuotes.push(await quotePath(sushiRouter, amountIn, p));
   }
 
@@ -120,6 +126,7 @@ async function main() {
   const comboLogs = [];
   for (const b of validBuyQuotes) {
     for (const sPath of sellCandidates) {
+      console.log('Trying sell path:', pathToStr(sPath));
       const s = await quotePath(quickRouter, b.out, sPath);
       comboLogs.push({ buyPath: b.path, buyOut: b.out, sellPath: sPath, sellOk: s.ok, sellOut: s.ok ? s.out : 0n, err: s.ok ? '' : s.error });
       if (s.ok && (!bestCombo || s.out > bestCombo.usdcBack)) {
@@ -147,8 +154,9 @@ async function main() {
   const requireNonNegative = (REQUIRE_NON_NEGATIVE || '1') !== '0';
 
   const usdcUnit = 10n ** BigInt(usdcDecimals);
-  const buyPriceScaled = (amountIn * usdcUnit) / (crvAmount || 1n);
-  const sellPriceScaled = (usdcBack * usdcUnit) / (crvAmount || 1n);
+  const crvUnit = 10n ** BigInt(crvDecimals);
+  const buyPriceScaled = (amountIn * crvUnit) / (crvAmount || 1n);
+  const sellPriceScaled = (usdcBack * crvUnit) / (crvAmount || 1n);
   const maxBuyPrice = MAX_BUY_PRICE_USDC ? hre.ethers.parseUnits(MAX_BUY_PRICE_USDC, usdcDecimals) : null;
   const minSellPrice = MIN_SELL_PRICE_USDC ? hre.ethers.parseUnits(MIN_SELL_PRICE_USDC, usdcDecimals) : null;
 
