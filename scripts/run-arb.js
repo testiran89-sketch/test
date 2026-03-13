@@ -43,9 +43,6 @@ async function main() {
   const required = [
     'ARB_CONTRACT',
     'USDC',
-    'CRV',
-    'SUSHISWAP_ROUTER',
-    'QUICKSWAP_ROUTER',
     'FLASH_AMOUNT_USDC'
   ];
   const missing = requireEnv(required);
@@ -69,11 +66,18 @@ async function main() {
     MIN_SELL_PRICE_USDC
   } = process.env;
 
+  const tokenOtherRaw = process.env.TOKEN_OTHER || process.env.CRV;
+  const buyRouterRaw = process.env.BUY_ROUTER || process.env.SUSHISWAP_ROUTER;
+  const sellRouterRaw = process.env.SELL_ROUTER || process.env.QUICKSWAP_ROUTER;
+  if (!tokenOtherRaw || !buyRouterRaw || !sellRouterRaw) {
+    throw new Error('Missing router/token vars. Set TOKEN_OTHER, BUY_ROUTER, SELL_ROUTER (or legacy CRV/SUSHISWAP_ROUTER/QUICKSWAP_ROUTER).');
+  }
+
   const ARB_CONTRACT = normalizeAddress(process.env.ARB_CONTRACT, 'ARB_CONTRACT');
   const USDC = normalizeAddress(process.env.USDC, 'USDC');
-  const CRV = normalizeAddress(process.env.CRV, 'CRV');
-  const SUSHISWAP_ROUTER = normalizeAddress(process.env.SUSHISWAP_ROUTER, 'SUSHISWAP_ROUTER');
-  const QUICKSWAP_ROUTER = normalizeAddress(process.env.QUICKSWAP_ROUTER, 'QUICKSWAP_ROUTER');
+  const TOKEN_OTHER = normalizeAddress(tokenOtherRaw, 'TOKEN_OTHER');
+  const BUY_ROUTER = normalizeAddress(buyRouterRaw, 'BUY_ROUTER');
+  const SELL_ROUTER = normalizeAddress(sellRouterRaw, 'SELL_ROUTER');
 
   const effectiveRpcUrl = process.env.POLYGON_RPC_URL || process.env.POLYGON_FALLBACK_RPC_URL || '';
   if (!effectiveRpcUrl) {
@@ -91,35 +95,35 @@ async function main() {
   const [signer] = await hre.ethers.getSigners();
   const arb = await hre.ethers.getContractAt('FlashLoanArbitrage', ARB_CONTRACT, signer);
   const usdc = new hre.ethers.Contract(USDC, ERC20_ABI, signer);
-  const crv = new hre.ethers.Contract(CRV, ERC20_ABI, signer);
-  const sushiRouter = new hre.ethers.Contract(SUSHISWAP_ROUTER, ROUTER_ABI, signer);
-  const quickRouter = new hre.ethers.Contract(QUICKSWAP_ROUTER, ROUTER_ABI, signer);
+  const tokenOther = new hre.ethers.Contract(TOKEN_OTHER, ERC20_ABI, signer);
+  const buyRouter = new hre.ethers.Contract(BUY_ROUTER, ROUTER_ABI, signer);
+  const sellRouter = new hre.ethers.Contract(SELL_ROUTER, ROUTER_ABI, signer);
 
   const usdcDecimals = await usdc.decimals();
-  const crvDecimals = await crv.decimals();
+  const tokenOtherDecimals = await tokenOther.decimals();
   const amountIn = hre.ethers.parseUnits(FLASH_AMOUNT_USDC, usdcDecimals);
 
-  const buyPathDirect = [USDC, CRV];
-  const buyPathViaWmatic = [USDC, WMATIC, CRV];
-  const buyPathViaWeth = [USDC, WETH, CRV];
+  const buyPathDirect = [USDC, TOKEN_OTHER];
+  const buyPathViaWmatic = [USDC, WMATIC, TOKEN_OTHER];
+  const buyPathViaWeth = [USDC, WETH, TOKEN_OTHER];
   const buyPathConfigured = parsePath(BUY_PATH, buyPathDirect);
   const buyCandidates = uniquePaths([buyPathConfigured, buyPathDirect, buyPathViaWmatic, buyPathViaWeth]);
 
-  const sellPathDirect = [CRV, USDC];
-  const sellPathViaWmatic = [CRV, WMATIC, USDC];
-  const sellPathViaWeth = [CRV, WETH, USDC];
+  const sellPathDirect = [TOKEN_OTHER, USDC];
+  const sellPathViaWmatic = [TOKEN_OTHER, WMATIC, USDC];
+  const sellPathViaWeth = [TOKEN_OTHER, WETH, USDC];
   const sellPathConfigured = parsePath(SELL_PATH, sellPathDirect);
   const sellCandidates = uniquePaths([sellPathConfigured, sellPathDirect, sellPathViaWmatic, sellPathViaWeth]);
 
   const buyQuotes = [];
   for (const p of buyCandidates) {
     console.log('Trying buy path:', pathToStr(p));
-    buyQuotes.push(await quotePath(sushiRouter, amountIn, p));
+    buyQuotes.push(await quotePath(buyRouter, amountIn, p));
   }
 
   const validBuyQuotes = buyQuotes.filter((q) => q.ok);
   if (validBuyQuotes.length === 0) {
-    throw new Error('No valid buy path on SushiSwap. Set BUY_PATH in .env (comma-separated addresses).');
+    throw new Error('No valid buy path on BUY_ROUTER. Set BUY_PATH in .env (comma-separated addresses).');
   }
 
   // Evaluate full (buyPath, sellPath) combinations and choose by max final USDC.
@@ -128,13 +132,13 @@ async function main() {
   for (const b of validBuyQuotes) {
     for (const sPath of sellCandidates) {
       console.log('Trying sell path:', pathToStr(sPath));
-      const s = await quotePath(quickRouter, b.out, sPath);
+      const s = await quotePath(sellRouter, b.out, sPath);
       comboLogs.push({ buyPath: b.path, buyOut: b.out, sellPath: sPath, sellOk: s.ok, sellOut: s.ok ? s.out : 0n, err: s.ok ? '' : s.error });
       if (s.ok && (!bestCombo || s.out > bestCombo.usdcBack)) {
         bestCombo = {
           buyPath: b.path,
           sellPath: sPath,
-          crvAmount: b.out,
+          tokenAmount: b.out,
           usdcBack: s.out
         };
       }
@@ -142,9 +146,9 @@ async function main() {
   }
 
   if (!bestCombo) {
-    throw new Error('No valid sell path on QuickSwap. Set SELL_PATH in .env (comma-separated addresses).');
+    throw new Error('No valid sell path on SELL_ROUTER. Set SELL_PATH in .env (comma-separated addresses).');
   }
-  const crvAmount = bestCombo.crvAmount;
+  const tokenOtherAmount = bestCombo.tokenAmount;
   const usdcBack = bestCombo.usdcBack;
 
   const flashFeeBps = Number(FLASH_FEE_BPS || '9'); // Aave default 0.09%
@@ -155,9 +159,9 @@ async function main() {
   const requireNonNegative = (REQUIRE_NON_NEGATIVE || '1') !== '0';
 
   const usdcUnit = 10n ** BigInt(usdcDecimals);
-  const crvUnit = 10n ** BigInt(crvDecimals);
-  const buyPriceScaled = (amountIn * crvUnit) / (crvAmount || 1n);
-  const sellPriceScaled = (usdcBack * crvUnit) / (crvAmount || 1n);
+  const tokenOtherUnit = 10n ** BigInt(tokenOtherDecimals);
+  const buyPriceScaled = (amountIn * tokenOtherUnit) / (tokenOtherAmount || 1n);
+  const sellPriceScaled = (usdcBack * tokenOtherUnit) / (tokenOtherAmount || 1n);
   const maxBuyPrice = (MAX_BUY_PRICE_USDC && Number(MAX_BUY_PRICE_USDC) > 0)
     ? hre.ethers.parseUnits(MAX_BUY_PRICE_USDC, usdcDecimals)
     : null;
@@ -190,17 +194,17 @@ async function main() {
   }
 
   const slippageBps = Number(SLIPPAGE_BPS || '30');
-  const minOutBuy = (crvAmount * BigInt(10000 - slippageBps)) / 10000n;
+  const minOutBuy = (tokenOtherAmount * BigInt(10000 - slippageBps)) / 10000n;
   const minOutSell = (usdcBack * BigInt(10000 - slippageBps)) / 10000n;
 
   const now = Math.floor(Date.now() / 1000);
   const deadline = now + 120;
 
   const params = {
-    buyRouter: SUSHISWAP_ROUTER,
-    sellRouter: QUICKSWAP_ROUTER,
+    buyRouter: BUY_ROUTER,
+    sellRouter: SELL_ROUTER,
     tokenBorrow: USDC,
-    tokenOther: CRV,
+    tokenOther: TOKEN_OTHER,
     buyPath: bestCombo.buyPath,
     sellPath: bestCombo.sellPath,
     minOutBuy,
@@ -218,13 +222,13 @@ async function main() {
   }
   console.log('Selected buy path:', pathToStr(bestCombo.buyPath));
   console.log('Selected sell path:', pathToStr(bestCombo.sellPath));
-  console.log('Estimated CRV bought:', crvAmount.toString());
+  console.log('Estimated token bought:', tokenOtherAmount.toString());
   console.log('Estimated USDC back:', usdcBack.toString());
   console.log('Estimated repayment (with flash fee):', repaymentEst.toString());
   console.log('Estimated net before gas:', estNet.toString());
   console.log('Minimum net required:', minNetUsdc.toString());
-  console.log('Implied buy price (USDC per CRV, scaled):', buyPriceScaled.toString());
-  console.log('Implied sell price (USDC per CRV, scaled):', sellPriceScaled.toString());
+  console.log('Implied buy price (USDC per token, scaled):', buyPriceScaled.toString());
+  console.log('Implied sell price (USDC per token, scaled):', sellPriceScaled.toString());
 
   try {
     await arb.startArbitrage.staticCall(amountIn, params, { gasLimit: 2_500_000 });

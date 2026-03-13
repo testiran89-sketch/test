@@ -98,6 +98,14 @@ Optional routing/sanity envs:
 - `MAX_BUY_PRICE_USDC`, `MIN_SELL_PRICE_USDC` guard rails (set `0` to disable),
 - `MIN_NET_USDC` minimum net profit threshold (recommended > gas buffer).
 
+To change pair/venue (e.g. WBTC/USDC, QuickSwap->Uniswap), set in `.env`:
+- `TOKEN_OTHER` (e.g. WBTC),
+- `BUY_ROUTER` (cheaper venue),
+- `SELL_ROUTER` (expensive venue),
+- optional `BUY_PATH` / `SELL_PATH` for explicit routing.
+
+Legacy names (`CRV`, `SUSHISWAP_ROUTER`, `QUICKSWAP_ROUTER`) are still accepted for backward compatibility.
+
 Price sanity calculations now use token decimals correctly (`USDC=6`, `CRV=18`) by reading decimals of both tokens.
 
 If spread collapses (e.g. ~0.01%), the runner should block by design via precheck (`estimated net <= 0` or below `MIN_NET_USDC`).

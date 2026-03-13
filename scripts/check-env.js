@@ -10,9 +10,6 @@ const requiredByMode = {
     'PRIVATE_KEY',
     'ARB_CONTRACT',
     'USDC',
-    'CRV',
-    'SUSHISWAP_ROUTER',
-    'QUICKSWAP_ROUTER',
     'FLASH_AMOUNT_USDC'
   ]
 };
@@ -40,9 +37,18 @@ if (missing.length > 0) {
 
 console.log('\nAll required env keys are present.');
 
+const tokenOtherRaw = process.env.TOKEN_OTHER || process.env.CRV;
+const buyRouterRaw = process.env.BUY_ROUTER || process.env.SUSHISWAP_ROUTER;
+const sellRouterRaw = process.env.SELL_ROUTER || process.env.QUICKSWAP_ROUTER;
+
+if (mode === 'arb' && (!tokenOtherRaw || !buyRouterRaw || !sellRouterRaw)) {
+  console.error('Address validation: FAIL - set TOKEN_OTHER, BUY_ROUTER, SELL_ROUTER (or legacy CRV/SUSHISWAP_ROUTER/QUICKSWAP_ROUTER).');
+  process.exit(1);
+}
+
 const addressFields = mode === 'deploy'
   ? ['AAVE_POOL']
-  : ['ARB_CONTRACT', 'USDC', 'CRV', 'SUSHISWAP_ROUTER', 'QUICKSWAP_ROUTER'];
+  : ['ARB_CONTRACT', 'USDC'];
 
 for (const field of addressFields) {
   try {
@@ -53,6 +59,17 @@ for (const field of addressFields) {
   }
 }
 
+
+if (mode === 'arb') {
+  try {
+    normalizeAddress(tokenOtherRaw, 'TOKEN_OTHER');
+    normalizeAddress(buyRouterRaw, 'BUY_ROUTER');
+    normalizeAddress(sellRouterRaw, 'SELL_ROUTER');
+  } catch (e) {
+    console.error(`Address validation: FAIL - ${e.message}`);
+    process.exit(1);
+  }
+}
 console.log('Address validation: OK');
 
 resolveRpcUrl(process.env)
