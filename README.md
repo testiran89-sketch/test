@@ -91,7 +91,7 @@ Runner now does a preflight profitability/safety simulation before broadcast:
 - estimates `repayment = amountIn + flashFee` (configurable via `FLASH_FEE_BPS`, default 9 bps),
 - checks estimated net `usdcBack - repayment` (blocked when `REQUIRE_NON_NEGATIVE=1`),
 - executes `startArbitrage.staticCall(...)` to catch on-chain revert reasons before spending gas.
-- auto-tests multiple paths (`direct` and `via WMATIC`) and chooses the best quoted route.
+- auto-tests multiple paths (`direct` and `via WMATIC`) and chooses the **best full buy+sell combination by final USDC back**.
 
 Optional routing/sanity envs:
 - `BUY_PATH`, `SELL_PATH` (comma-separated addresses),

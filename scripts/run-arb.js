@@ -32,6 +32,10 @@ function pathToStr(path) {
   return path.join(' -> ');
 }
 
+function uniquePaths(paths) {
+  return paths.filter((p, i, a) => a.findIndex((x) => x.join('-') === p.join('-')) === i);
+}
+
 async function main() {
   const { loadedFrom } = loadEnv();
 
@@ -94,34 +98,46 @@ async function main() {
   const buyPathDirect = [USDC, CRV];
   const buyPathViaWmatic = [USDC, WMATIC, CRV];
   const buyPathConfigured = parsePath(BUY_PATH, buyPathDirect);
-  const buyCandidates = [buyPathConfigured, buyPathDirect, buyPathViaWmatic]
-    .filter((p, i, a) => a.findIndex((x) => x.join('-') === p.join('-')) === i);
-
-  let bestBuy = null;
-  for (const p of buyCandidates) {
-    const q = await quotePath(sushiRouter, amountIn, p);
-    if (q.ok && (!bestBuy || q.out > bestBuy.out)) bestBuy = q;
-  }
-  if (!bestBuy) {
-    throw new Error('No valid buy path on SushiSwap. Set BUY_PATH in .env (comma-separated addresses).');
-  }
-  const crvAmount = bestBuy.out;
+  const buyCandidates = uniquePaths([buyPathConfigured, buyPathDirect, buyPathViaWmatic]);
 
   const sellPathDirect = [CRV, USDC];
   const sellPathViaWmatic = [CRV, WMATIC, USDC];
   const sellPathConfigured = parsePath(SELL_PATH, sellPathDirect);
-  const sellCandidates = [sellPathConfigured, sellPathDirect, sellPathViaWmatic]
-    .filter((p, i, a) => a.findIndex((x) => x.join('-') === p.join('-')) === i);
+  const sellCandidates = uniquePaths([sellPathConfigured, sellPathDirect, sellPathViaWmatic]);
 
-  let bestSell = null;
-  for (const p of sellCandidates) {
-    const q = await quotePath(quickRouter, crvAmount, p);
-    if (q.ok && (!bestSell || q.out > bestSell.out)) bestSell = q;
+  const buyQuotes = [];
+  for (const p of buyCandidates) {
+    buyQuotes.push(await quotePath(sushiRouter, amountIn, p));
   }
-  if (!bestSell) {
+
+  const validBuyQuotes = buyQuotes.filter((q) => q.ok);
+  if (validBuyQuotes.length === 0) {
+    throw new Error('No valid buy path on SushiSwap. Set BUY_PATH in .env (comma-separated addresses).');
+  }
+
+  // Evaluate full (buyPath, sellPath) combinations and choose by max final USDC.
+  let bestCombo = null;
+  const comboLogs = [];
+  for (const b of validBuyQuotes) {
+    for (const sPath of sellCandidates) {
+      const s = await quotePath(quickRouter, b.out, sPath);
+      comboLogs.push({ buyPath: b.path, buyOut: b.out, sellPath: sPath, sellOk: s.ok, sellOut: s.ok ? s.out : 0n, err: s.ok ? '' : s.error });
+      if (s.ok && (!bestCombo || s.out > bestCombo.usdcBack)) {
+        bestCombo = {
+          buyPath: b.path,
+          sellPath: sPath,
+          crvAmount: b.out,
+          usdcBack: s.out
+        };
+      }
+    }
+  }
+
+  if (!bestCombo) {
     throw new Error('No valid sell path on QuickSwap. Set SELL_PATH in .env (comma-separated addresses).');
   }
-  const usdcBack = bestSell.out;
+  const crvAmount = bestCombo.crvAmount;
+  const usdcBack = bestCombo.usdcBack;
 
   const flashFeeBps = Number(FLASH_FEE_BPS || '9'); // Aave default 0.09%
   const flashFee = (amountIn * BigInt(flashFeeBps)) / 10000n;
@@ -162,16 +178,23 @@ async function main() {
     sellRouter: QUICKSWAP_ROUTER,
     tokenBorrow: USDC,
     tokenOther: CRV,
-    buyPath: bestBuy.path,
-    sellPath: bestSell.path,
+    buyPath: bestCombo.buyPath,
+    sellPath: bestCombo.sellPath,
     minOutBuy,
     minOutSell,
     deadline
   };
 
   console.log('Loaded .env from:', loadedFrom || 'not found');
-  console.log('Buy path:', pathToStr(bestBuy.path));
-  console.log('Sell path:', pathToStr(bestSell.path));
+  for (const c of comboLogs) {
+    if (c.sellOk) {
+      console.log(`Combo quote OK | buy: ${pathToStr(c.buyPath)} => ${c.buyOut} | sell: ${pathToStr(c.sellPath)} => ${c.sellOut}`);
+    } else {
+      console.log(`Combo quote FAIL | buy: ${pathToStr(c.buyPath)} => ${c.buyOut} | sell: ${pathToStr(c.sellPath)} | err: ${c.err}`);
+    }
+  }
+  console.log('Selected buy path:', pathToStr(bestCombo.buyPath));
+  console.log('Selected sell path:', pathToStr(bestCombo.sellPath));
   console.log('Estimated CRV bought:', crvAmount.toString());
   console.log('Estimated USDC back:', usdcBack.toString());
   console.log('Estimated repayment (with flash fee):', repaymentEst.toString());
