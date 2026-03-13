@@ -62,6 +62,7 @@ async function main() {
     SLIPPAGE_BPS,
     FLASH_FEE_BPS,
     REQUIRE_NON_NEGATIVE,
+    MIN_NET_USDC,
     BUY_PATH,
     SELL_PATH,
     MAX_BUY_PRICE_USDC,
@@ -157,8 +158,15 @@ async function main() {
   const crvUnit = 10n ** BigInt(crvDecimals);
   const buyPriceScaled = (amountIn * crvUnit) / (crvAmount || 1n);
   const sellPriceScaled = (usdcBack * crvUnit) / (crvAmount || 1n);
-  const maxBuyPrice = MAX_BUY_PRICE_USDC ? hre.ethers.parseUnits(MAX_BUY_PRICE_USDC, usdcDecimals) : null;
-  const minSellPrice = MIN_SELL_PRICE_USDC ? hre.ethers.parseUnits(MIN_SELL_PRICE_USDC, usdcDecimals) : null;
+  const maxBuyPrice = (MAX_BUY_PRICE_USDC && Number(MAX_BUY_PRICE_USDC) > 0)
+    ? hre.ethers.parseUnits(MAX_BUY_PRICE_USDC, usdcDecimals)
+    : null;
+  const minSellPrice = (MIN_SELL_PRICE_USDC && Number(MIN_SELL_PRICE_USDC) > 0)
+    ? hre.ethers.parseUnits(MIN_SELL_PRICE_USDC, usdcDecimals)
+    : null;
+  const minNetUsdc = (MIN_NET_USDC && Number(MIN_NET_USDC) > 0)
+    ? hre.ethers.parseUnits(MIN_NET_USDC, usdcDecimals)
+    : 0n;
 
   if (maxBuyPrice && buyPriceScaled > maxBuyPrice) {
     throw new Error(`Precheck failed: buy implied price too high (${buyPriceScaled} > ${maxBuyPrice}). Route likely wrong.`);
@@ -171,6 +179,13 @@ async function main() {
     throw new Error(
       `Precheck failed: estimated net <= 0. amountIn=${amountIn} usdcBack=${usdcBack} repaymentEst=${repaymentEst}. ` +
       'Set REQUIRE_NON_NEGATIVE=0 to bypass (not recommended).'
+    );
+  }
+
+  if (estNet < minNetUsdc) {
+    throw new Error(
+      `Precheck failed: estimated net (${estNet}) is below MIN_NET_USDC (${minNetUsdc}). ` +
+      'Current spread is too small after fees/slippage.'
     );
   }
 
@@ -207,6 +222,7 @@ async function main() {
   console.log('Estimated USDC back:', usdcBack.toString());
   console.log('Estimated repayment (with flash fee):', repaymentEst.toString());
   console.log('Estimated net before gas:', estNet.toString());
+  console.log('Minimum net required:', minNetUsdc.toString());
   console.log('Implied buy price (USDC per CRV, scaled):', buyPriceScaled.toString());
   console.log('Implied sell price (USDC per CRV, scaled):', sellPriceScaled.toString());
 

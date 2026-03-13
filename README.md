@@ -95,9 +95,12 @@ Runner now does a preflight profitability/safety simulation before broadcast:
 
 Optional routing/sanity envs:
 - `BUY_PATH`, `SELL_PATH` (comma-separated addresses),
-- `MAX_BUY_PRICE_USDC`, `MIN_SELL_PRICE_USDC` guard rails.
+- `MAX_BUY_PRICE_USDC`, `MIN_SELL_PRICE_USDC` guard rails (set `0` to disable),
+- `MIN_NET_USDC` minimum net profit threshold (recommended > gas buffer).
 
 Price sanity calculations now use token decimals correctly (`USDC=6`, `CRV=18`) by reading decimals of both tokens.
+
+If spread collapses (e.g. ~0.01%), the runner should block by design via precheck (`estimated net <= 0` or below `MIN_NET_USDC`).
 
 ⚠️ If you pull this update, redeploy contract and update `ARB_CONTRACT` because `ArbParams` ABI changed (dynamic paths were added).
 
