@@ -1,0 +1,18 @@
+{
+  "name": "polygon-flashloan-arb",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "hardhat compile",
+    "test": "hardhat test",
+    "deploy": "node scripts/run-hardhat-with-rpc.js deploy",
+    "arb": "node scripts/run-hardhat-with-rpc.js arb",
+    "check-env": "node scripts/check-env.js arb",
+    "check-env:deploy": "node scripts/check-env.js deploy"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "dotenv": "^16.4.5",
+    "hardhat": "^2.22.10"
+  }
+}
