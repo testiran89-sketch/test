@@ -46,6 +46,14 @@ npm run executor
 npx hardhat run scripts/deploy.ts --network hardhat
 ```
 
+
+## Flashbots auth key (when you do not have one yet)
+You do **not** need to request access manually. Create a local ephemeral signing key:
+```bash
+cast wallet new
+```
+Use the generated private key as `FLASHBOTS_AUTH_KEY` (do not fund it; it is only for relay identity/signing headers).
+
 ## Flashbots relay and Protect
 - Default relay: `https://relay.flashbots.net`
 - Protect fallback: `https://rpc.flashbots.net`
