@@ -12,7 +12,7 @@ export interface SimulationRequest {
 
 export async function simulateCall(req: SimulationRequest) {
   const provider = new JsonRpcProvider(process.env.RPC_URL);
-  const result = await provider.call({ to: req.to, data: req.data, from: req.from }, req.blockTag ?? "pending");
+  const result = await provider.call({ to: req.to, data: req.data, from: req.from, blockTag: req.blockTag ?? "pending" });
   const gasEstimate = await provider.estimateGas({ to: req.to, data: req.data, from: req.from });
   return { ok: true, returnData: result, gasUsed: gasEstimate.toString() };
 }

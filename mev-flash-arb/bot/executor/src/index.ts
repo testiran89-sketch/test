@@ -33,7 +33,7 @@ export function recordBundle(opportunityId: string, targetBlock: number, status:
 
 async function main() {
   recordBundle("demo", 0, "simulated", "0", "0");
-  logger.info(await registry.metrics(), "metrics");
+  logger.info({ metrics: await registry.metrics() }, "metrics");
 }
 
 if (require.main === module) {

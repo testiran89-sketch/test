@@ -12,7 +12,9 @@
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.10.0",
+    "dotenv": "^16.4.7",
     "hardhat": "^2.22.17",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
