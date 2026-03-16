@@ -28,8 +28,7 @@ contract SushiAdapter {
     {
         uint256 amountOutMin = abi.decode(data, (uint256));
         IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
-        IERC20(tokenIn).safeApprove(address(router), 0);
-        IERC20(tokenIn).safeApprove(address(router), amountIn);
+        IERC20(tokenIn).forceApprove(address(router), amountIn);
         address[] memory path = new address[](2);
         path[0] = tokenIn;
         path[1] = tokenOut;

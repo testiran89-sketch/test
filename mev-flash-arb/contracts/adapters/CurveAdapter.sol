@@ -19,8 +19,7 @@ contract CurveAdapter {
     function executeSwap(address tokenIn, address, uint256 amountIn, bytes calldata data) external returns (uint256 amountOut) {
         (int128 i, int128 j, uint256 minDy) = abi.decode(data, (int128, int128, uint256));
         IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
-        IERC20(tokenIn).safeApprove(address(pool), 0);
-        IERC20(tokenIn).safeApprove(address(pool), amountIn);
+        IERC20(tokenIn).forceApprove(address(pool), amountIn);
         amountOut = pool.exchange(i, j, amountIn, minDy);
     }
 }

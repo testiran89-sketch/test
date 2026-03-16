@@ -33,8 +33,7 @@ contract UniswapV3Adapter {
     {
         (uint24 fee, uint256 amountOutMinimum) = abi.decode(data, (uint24, uint256));
         IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
-        IERC20(tokenIn).safeApprove(address(router), 0);
-        IERC20(tokenIn).safeApprove(address(router), amountIn);
+        IERC20(tokenIn).forceApprove(address(router), amountIn);
         amountOut = router.exactInputSingle(
             ISwapRouter.ExactInputSingleParams({
                 tokenIn: tokenIn,

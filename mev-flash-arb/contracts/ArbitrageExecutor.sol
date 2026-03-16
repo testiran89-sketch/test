@@ -130,8 +130,7 @@ contract ArbitrageExecutor is ReentrancyGuard, Ownable, IFlashLoanRecipient {
         if (msg.sender != address(aavePool)) revert NotFlashLoanProvider();
         (ArbPlan memory plan, address receiver) = abi.decode(params, (ArbPlan, address));
         _executePlan(plan, premium);
-        IERC20(asset).safeApprove(address(aavePool), 0);
-        IERC20(asset).safeApprove(address(aavePool), amount + premium);
+        IERC20(asset).forceApprove(address(aavePool), amount + premium);
         _payout(receiver, plan.opportunityId);
         return true;
     }
@@ -156,8 +155,7 @@ contract ArbitrageExecutor is ReentrancyGuard, Ownable, IFlashLoanRecipient {
 
         for (uint256 i = 0; i < plan.steps.length; ++i) {
             SwapStep memory step = plan.steps[i];
-            IERC20(step.tokenIn).safeApprove(step.adapter, 0);
-            IERC20(step.tokenIn).safeApprove(step.adapter, amount);
+            IERC20(step.tokenIn).forceApprove(step.adapter, amount);
             uint256 out = ISwapAdapter(step.adapter).executeSwap(step.tokenIn, step.tokenOut, amount, step.data);
             emit SwapStepExecuted(step.adapter, step.tokenIn, step.tokenOut, amount, out);
             amount = out;
