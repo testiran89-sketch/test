@@ -13,10 +13,12 @@ Production-oriented MEV arbitrage framework for **Arbitrum + Avalanche** with a 
 ## Quick start
 ```bash
 cp .env.example .env
-npm ci
+npm install
 npm run build
 npm test
 ```
+
+> Note: this scaffold currently uses `npm install` (not `npm ci`) because a committed lockfile is not yet shipped.
 
 ## Local fork setup
 ```bash
