@@ -1,0 +1,10 @@
+{
+  "relayUrl": "https://relay.flashbots.net",
+  "protectRpc": "https://rpc.flashbots.net",
+  "maxPriorityFeeGwei": 0.05,
+  "maxGasPriceGwei": 5,
+  "bundleRetry": {
+    "maxAttempts": 3,
+    "backoffMs": 250
+  }
+}
