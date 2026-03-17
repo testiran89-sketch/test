@@ -87,3 +87,8 @@ TARGET_BLOCK_HEX=0x... BUNDLE_TXS=0xsigned1,0xsigned2 npm run tsx scripts/simula
 - `minProfitThreshold` should include gas + flashloan fee + 30% safety buffer.
 - Never log private keys.
 - Use HSM/KMS signer in production.
+
+
+## Troubleshooting
+- **mempool-listener 403 on websocket**: many public RPC providers block `newPendingTransactions`. Use your own node or local Anvil WS endpoint (`WS_RPC_URL=ws://127.0.0.1:8545`).
+- **local_fork_setup.sh run twice**: second run may fail due to occupied ports/fork initialization conflict. Stop previous Anvil processes first, or set `ARBITRUM_FORK_PORT` / `AVALANCHE_FORK_PORT` to different values.

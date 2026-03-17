@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -22,14 +23,14 @@ type PendingEvent struct {
 }
 
 func main() {
-	rpcURL := os.Getenv("WS_RPC_URL")
+	rpcURL := resolveWSURL()
 	if rpcURL == "" {
-		log.Fatal("WS_RPC_URL required")
+		log.Fatal("WS_RPC_URL required (or set RPC_URL to auto-convert http->ws)")
 	}
 
 	rpcClient, err := rpc.Dial(rpcURL)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("websocket dial failed for %s: %v", rpcURL, err)
 	}
 	defer rpcClient.Close()
 
@@ -38,9 +39,11 @@ func main() {
 	ch := make(chan common.Hash, 1024)
 	sub, err := rpcClient.EthSubscribe(context.Background(), ch, "newPendingTransactions")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("pending subscription failed: %v. Hint: many public providers block mempool WS (403). Use your own node or local anvil ws://127.0.0.1:8545", err)
 	}
 	defer sub.Unsubscribe()
+
+	log.Printf("subscribed to newPendingTransactions via %s", rpcURL)
 
 	for {
 		select {
@@ -56,6 +59,23 @@ func main() {
 			log.Printf("pending_event=%s", string(b))
 		}
 	}
+}
+
+func resolveWSURL() string {
+	if ws := os.Getenv("WS_RPC_URL"); ws != "" {
+		return ws
+	}
+	rpcURL := os.Getenv("RPC_URL")
+	if rpcURL == "" {
+		return ""
+	}
+	if strings.HasPrefix(rpcURL, "https://") {
+		return "wss://" + strings.TrimPrefix(rpcURL, "https://")
+	}
+	if strings.HasPrefix(rpcURL, "http://") {
+		return "ws://" + strings.TrimPrefix(rpcURL, "http://")
+	}
+	return rpcURL
 }
 
 func parseCandidate(tx *types.Transaction) PendingEvent {
