@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 )
 
 type PendingEvent struct {
@@ -21,19 +22,26 @@ type PendingEvent struct {
 }
 
 func main() {
-	rpc := os.Getenv("WS_RPC_URL")
-	if rpc == "" {
+	rpcURL := os.Getenv("WS_RPC_URL")
+	if rpcURL == "" {
 		log.Fatal("WS_RPC_URL required")
 	}
-	client, err := ethclient.Dial(rpc)
+
+	rpcClient, err := rpc.Dial(rpcURL)
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer rpcClient.Close()
+
+	client := ethclient.NewClient(rpcClient)
+
 	ch := make(chan common.Hash, 1024)
-	sub, err := client.SubscribePendingTransactions(context.Background(), ch)
+	sub, err := rpcClient.EthSubscribe(context.Background(), ch, "newPendingTransactions")
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer sub.Unsubscribe()
+
 	for {
 		select {
 		case err := <-sub.Err():
