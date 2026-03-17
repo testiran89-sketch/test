@@ -48,6 +48,16 @@ npm run executor
 npx hardhat run scripts/deploy.ts --network hardhat
 ```
 
+## Testing notes
+- Unit tests run on in-memory Hardhat by default (no RPC fork needed):
+```bash
+npm test
+```
+- Enable fork mode only when you explicitly need live-state tests:
+```bash
+ENABLE_FORKING=true ARBITRUM_RPC_URL=https://... npm test
+```
+
 
 ## Flashbots auth key (when you do not have one yet)
 You do **not** need to request access manually. Create a local ephemeral signing key:
