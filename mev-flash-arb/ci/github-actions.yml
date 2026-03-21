@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-test-security:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mev-flash-arb
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm run build
+      - run: npm test
+      - name: Slither
+        uses: crytic/slither-action@v0.4.0
+        with:
+          target: ./contracts
+      - name: Mythril
+        run: |
+          pip3 install mythril
+          myth analyze contracts/ArbitrageExecutor.sol --execution-timeout 120
